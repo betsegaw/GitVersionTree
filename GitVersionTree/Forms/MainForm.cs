@@ -163,176 +163,27 @@ namespace GitVersionTree
 
         private void Generate()
         {
-            string Result;
-            string[] MergedColumns;
-            string[] MergedParents;
-
-            Status("Getting git commit(s) ...");
-            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --pretty=format:\"%h|%p|%d\"");
-            if (String.IsNullOrEmpty(Result))
-            {
-                Status("Unable to get get branch or branch empty ...");
-            }
-            else
-            {
-                File.AppendAllText(LogFilename, "[commit(s)]\r\n");
-                File.AppendAllText(LogFilename, Result + "\r\n");
-                string[] DecorateLines = Result.Split('\n');
-                foreach (string DecorateLine in DecorateLines)
-                {
-                    MergedColumns = DecorateLine.Split('|');
-                    if (!String.IsNullOrEmpty(MergedColumns[2]))
-                    {
-                        DecorateDictionary.Add(MergedColumns[0], MergedColumns[2]);
-                    }
-                }
-                Status("Processed " + DecorateDictionary.Count + " decorate(s) ...");
-            }
-
-            Status("Getting git ref branch(es) ...");
-            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "); //refs/heads/
-            if (String.IsNullOrEmpty(Result))
-            {
-                Status("Unable to get get branch or branch empty ...");
-            }
-            else
-            {
-                File.AppendAllText(LogFilename, "[ref branch(es)]\r\n");
-                File.AppendAllText(LogFilename, Result + "\r\n");
-                string[] RefLines = Result.Split('\n');
-                foreach (string RefLine in RefLines)
-                {
-                    if (!String.IsNullOrEmpty(RefLine))
-                    {
-                        string[] RefColumns = RefLine.Split('|');
-                        if (!RefColumns[1].ToLower().StartsWith("refs/tags"))
-                        if (RefColumns[1].ToLower().Contains("master"))
-                        {
-                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + RefColumns[0]);
-                            if (String.IsNullOrEmpty(Result))
-                            {
-                                Status("Unable to get commit(s) ...");
-                            }
-                            else
-                            {
-                                string[] HashLines = Result.Split('\n');
-                                Nodes.Add(new List<string>());
-                                foreach (string HashLine in HashLines)
-                                {
-                                    Nodes[Nodes.Count - 1].Add(HashLine);
-                                }
-                            }
-                        }
-                    }
-                }
-                foreach (string RefLine in RefLines)
-                {
-                    if (!String.IsNullOrEmpty(RefLine))
-                    {
-                        string[] RefColumns = RefLine.Split('|');
-                        if (!RefColumns[1].ToLower().StartsWith("refs/tags"))
-                        if (!RefColumns[1].ToLower().Contains("master"))
-                        {
-                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + RefColumns[0]);
-                            if (String.IsNullOrEmpty(Result))
-                            {
-                                Status("Unable to get commit(s) ...");
-                            }
-                            else
-                            {
-                                string[] HashLines = Result.Split('\n');
-                                Nodes.Add(new List<string>());
-                                foreach (string HashLine in HashLines)
-                                {
-                                    Nodes[Nodes.Count - 1].Add(HashLine);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Status("Getting git merged branch(es) ...");
-            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --merges --pretty=format:\"%h|%p\"");
-            if (String.IsNullOrEmpty(Result))
-            {
-                Status("Unable to get get branch or branch empty ...");
-            }
-            else
-            {
-                File.AppendAllText(LogFilename, "[merged branch(es)]\r\n");
-                File.AppendAllText(LogFilename, Result + "\r\n");
-                string[] MergedLines = Result.Split('\n');
-                foreach (string MergedLine in MergedLines)
-                {
-                    MergedColumns = MergedLine.Split('|');
-                    MergedParents = MergedColumns[1].Split(' ');
-                    if (MergedParents.Length > 1)
-                    {
-                        for (int i = 1; i < MergedParents.Length; i++)
-                        {
-                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + MergedParents[i]);
-                            if (String.IsNullOrEmpty(Result))
-                            {
-                                Status("Unable to get commit(s) ...");
-                            }
-                            else
-                            {
-                                string[] HashLines = Result.Split('\n');
-                                Nodes.Add(new List<string>());
-                                foreach (string HashLine in HashLines)
-                                {
-                                    Nodes[Nodes.Count - 1].Add(HashLine);
-                                }
-                                Nodes[Nodes.Count - 1].Add(MergedColumns[0]);
-                            }
-                        }
-                    }
-                }
-            }
-
-            Status("Processed " + Nodes.Count + " branch(es) ...");
+            var repo = new LibGit2Sharp.Repository(Reg.Read("GitRepositoryPath"));
 
             StringBuilder DotStringBuilder = new StringBuilder();
             Status("Generating dot file ...");
-            DotStringBuilder.Append("strict digraph \"" + RepositoryName + "\" {\r\n");
-            //DotStringBuilder.Append("  splines=line;\r\n");
-            for (int i = 0; i < Nodes.Count; i++)
-            {
-                DotStringBuilder.Append("  node[group=\"" + (i + 1) + "\"];\r\n");
-                DotStringBuilder.Append("  ");
-                for (int j = 0; j < Nodes[i].Count; j++)
-                {
-                    DotStringBuilder.Append("\"" + Nodes[i][j] + "\"");
-                    if (j < Nodes[i].Count - 1)
-                    {
-                        DotStringBuilder.Append(" -> ");
-                    }
-                    else
-                    {
-                        DotStringBuilder.Append(";");
-                    }
-                }
-                DotStringBuilder.Append("\r\n");
-            }
+            DotStringBuilder.Append("digraph " + RepositoryName + " {\r\n");
 
-            int DecorateCount = 0;
-            foreach(KeyValuePair<string, string> DecorateKeyValuePair in DecorateDictionary)
+            var objs = repo.ObjectDatabase;
+
+            //var commits = repo.ObjectDatabase.Where(x => x.)
+
+            foreach(var obj in objs)
             {
-                DecorateCount++;
-                DotStringBuilder.Append("  subgraph Decorate" + DecorateCount + "\r\n");
-                DotStringBuilder.Append("  {\r\n");
-                DotStringBuilder.Append("    rank=\"same\";\r\n");
-                if (DecorateKeyValuePair.Value.Trim().Substring(0, 5) == "(tag:")
+                if (obj.GetType() == typeof(LibGit2Sharp.Commit))
                 {
-                    DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" [shape=\"box\", style=\"filled\", fillcolor=\"#ffffdd\"];\r\n");
+                    var commit = (LibGit2Sharp.Commit)obj; 
+
+                    foreach (var parent in commit.Parents)
+                    {
+                        DotStringBuilder.Append("\"" + parent.Sha.Substring(0, 5) + "\"" + "->" + "\"" + commit.Sha.Substring(0, 5) + "\"" + ";\n");
+                    }
                 }
-                else
-                {
-                    DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" [shape=\"box\", style=\"filled\", fillcolor=\"#ddddff\"];\r\n");
-                }
-                DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" -> \"" + DecorateKeyValuePair.Key + "\" [weight=0, arrowtype=\"none\", dirtype=\"none\", arrowhead=\"none\", style=\"dotted\"];\r\n");
-                DotStringBuilder.Append("  }\r\n");
             }
 
             DotStringBuilder.Append("}\r\n");
