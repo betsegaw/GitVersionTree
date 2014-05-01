@@ -167,7 +167,7 @@ namespace GitVersionTree
 
             StringBuilder DotStringBuilder = new StringBuilder();
             Status("Generating dot file ...");
-            DotStringBuilder.Append("digraph " + RepositoryName + " {\r\n");
+            DotStringBuilder.Append("digraph " + RepositoryName.Replace(" ","").Replace("-","") + " {\r\n");
 
             var objs = repo.ObjectDatabase;
 
