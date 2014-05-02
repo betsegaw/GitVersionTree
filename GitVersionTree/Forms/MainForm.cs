@@ -171,8 +171,6 @@ namespace GitVersionTree
 
             var objs = repo.ObjectDatabase;
 
-            //var commits = repo.ObjectDatabase.Where(x => x.)
-
             foreach(var obj in objs)
             {
                 if (obj.GetType() == typeof(LibGit2Sharp.Commit))
@@ -181,7 +179,19 @@ namespace GitVersionTree
 
                     foreach (var parent in commit.Parents)
                     {
-                        DotStringBuilder.Append("\"" + parent.Sha.Substring(0, 5) + "\"" + "->" + "\"" + commit.Sha.Substring(0, 5) + "\"" + ";\n");
+                        DotStringBuilder.Append(
+                            "\"" + 
+                            parent.Sha + "\n" +
+                            parent.Author + "\n" +
+                            parent.MessageShort.Replace("\"","'") + "\n" +
+                            "\"" + 
+                            "->" + 
+                            "\"" +
+                            commit.Sha + "\n" +
+                            commit.Author + "\n" +
+                            commit.MessageShort.Replace("\"", "'") + "\n" +
+                            "\"" + 
+                            ";\n");
                     }
                 }
             }
